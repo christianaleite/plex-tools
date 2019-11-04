@@ -14,7 +14,7 @@
 #######################################
 function get_watched {
 
-	sqlite3 -list "$PLEX_DATABASE" "select distinct(item.guid) from accounts account, metadata_items item, metadata_item_settings setting where account.name='$1' and item.metadata_type in (1,4) and (item.guid like 'com.plexapp.agents.imdb%' or item.guid like 'com.plexapp.agents.thetvdb%') and setting.account_id=account.id and setting.guid=item.guid and setting.view_count>0;" > $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-watched
+	sqlite3 -list "$PLEX_DATABASE" "select distinct(item.guid) from accounts account, metadata_items item, metadata_item_settings setting where account.name='$1' and item.metadata_type in (1,4) and (item.guid like 'com.plexapp.agents.imdb%' or item.guid like 'com.plexapp.agents.thetvdb%') and setting.account_id=account.id and setting.guid=item.guid and setting.view_count>0;" > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-watched
 	echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-watched"
 
 }
@@ -33,7 +33,7 @@ function get_watched {
 #######################################
 function get_unwatched {
 
-	sqlite3 -list "$PLEX_DATABASE" "select distinct(item.guid) from metadata_items item where item.metadata_type in (1,4) and (item.guid like 'com.plexapp.agents.imdb%' or item.guid like 'com.plexapp.agents.thetvdb%') and item.guid not in (select setting.guid from accounts account, metadata_item_settings setting where account.name='$1' and setting.account_id=account.id and setting.view_count>0);" > $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-unwatched
+	sqlite3 -list "$PLEX_DATABASE" "select distinct(item.guid) from metadata_items item where item.metadata_type in (1,4) and (item.guid like 'com.plexapp.agents.imdb%' or item.guid like 'com.plexapp.agents.thetvdb%') and item.guid not in (select setting.guid from accounts account, metadata_item_settings setting where account.name='$1' and setting.account_id=account.id and setting.view_count>0);" > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-unwatched
 	echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-unwatched"
 
 }
@@ -51,10 +51,10 @@ function get_unwatched {
 #######################################
 function merge_server_stats {
 
-	cat $WORK_DIRECTORY/*-$1-watched | sort | uniq -u > $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-watched-merged
+	cat "$WORK_DIRECTORY"/*-$1-watched | sort | uniq -u > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-watched-merged
 	echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-merged-watched"
 
-	cat $WORK_DIRECTORY/*-$1-unwatched | sort | uniq -u > $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-unwatched-merged
+	cat "$WORK_DIRECTORY"/*-$1-unwatched | sort | uniq -u > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-unwatched-merged
 	echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-merged-unwatched"
 
 }
@@ -74,7 +74,7 @@ function merge_server_stats {
 function compare_viewed_servers {
 
 	# Find all the guid's that are present in both watched and unwatched temporary files as these are the media that needs to be marked as watched
-	cat $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-unwatched $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-watched-merged | sort | uniq -d > $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-update
+	cat "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-unwatched "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-watched-merged | sort | uniq -d > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$1-update
 	echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$1-update"
 
 }
@@ -98,7 +98,7 @@ function compare_viewed_accounts {
 	
 	# To find the GUID's of the watched media on all of the accounts we must merge the viewed files for the server and check the number
 	# of ocurrences for each GUID. If the number of ocurrences is equal to the number of accounts then we found a GUID that is present on all of them
-	cat $WORK_DIRECTORY/$PLEX_SERVER_NAME-*-watched | sort | uniq -c | grep "^ *${#PLEX_ACCOUNTS_ARRAY_TEMP[@]}" | cut -d " " -f 8 > $WORK_DIRECTORY/$PLEX_SERVER_NAME-watched-intersection
+	cat "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-*-watched | sort | uniq -c | grep "^ *${#PLEX_ACCOUNTS_ARRAY_TEMP[@]}" | cut -d " " -f 8 > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-watched-intersection
 	echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-watched-intersection"
 
 }
@@ -155,13 +155,13 @@ function update_watched {
 #######################################
 function load_config {
 	# Check if config file exists
-	if [ ! -e $1 ]; then
+	if [ ! -e "$1" ]; then
 		echo "Configuration file $1 not found."
 		exit 1
 	fi
 
 	# Load config file values as variables
-	source $1
+	source "$1"
 }
 
 #######################################
@@ -195,7 +195,7 @@ NOW=$(date +"%d-%b-%Y %T")
 
 
 if [ $# -ge 2 ]; then
-	load_config $1
+	load_config "$1"
 
 	case $2 in
 			list_user_accounts)
@@ -261,18 +261,18 @@ if [ $# -ge 2 ]; then
 						IFS=',' read -ra PLEX_ACCOUNTS_ARRAY <<< "$PLEX_ACCOUNTS"
 						account=${PLEX_ACCOUNTS_ARRAY[x]}
 
-						sqlite3 -list "$PLEX_DATABASE" "select part.file from metadata_items metadata, media_items media, media_parts part where metadata.parent_id in (select id from metadata_items where parent_id in (select id from metadata_items where tags_collection='$PLEX_COLLECTION')) and metadata.guid not in (select setting.guid from accounts account, metadata_item_settings setting where account.name='$account' and setting.account_id=account.id and setting.view_count>0) and media.metadata_item_id=metadata.id and part.media_item_id=media.id;" | sed -r s/.{3}$/*\/ | rev | cut -d "/" -f -4 | rev > $WORK_DIRECTORY/$PLEX_SERVER_NAME-${PLEX_ACCOUNTS_ARRAY[x]}-sync
+						sqlite3 -list "$PLEX_DATABASE" "select part.file from metadata_items metadata, media_items media, media_parts part where metadata.parent_id in (select id from metadata_items where parent_id in (select id from metadata_items where tags_collection='$PLEX_COLLECTION')) and metadata.guid not in (select setting.guid from accounts account, metadata_item_settings setting where account.name='$account' and setting.account_id=account.id and setting.view_count>0) and media.metadata_item_id=metadata.id and part.media_item_id=media.id;" | sed -r s/.{3}$/*\/ | rev | cut -d "/" -f -4 | rev > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-${PLEX_ACCOUNTS_ARRAY[x]}-sync
 						echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$account-sync"
 						
 						cd $SYNC_SOURCE_DIRECTORY
 
-						find . | grep -f $WORK_DIRECTORY/$PLEX_SERVER_NAME-$account-sync | sed  's/ /\\ /g' > $WORK_DIRECTORY/$PLEX_SERVER_NAME-$account-sync-complete
+						find . | grep -f "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$account-sync | sed  's/ /\\ /g' > "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$account-sync-complete
 						echo "Created Work File: $WORK_DIRECTORY/$PLEX_SERVER_NAME-$account-sync-complete"
 
 						echo "Syncing files to destination directory ($SYNC_DEST_DIRECTORY)..."
 
 						# Create hard link's in the destination directory of all the media that needs to be synced
-						xargs -a $WORK_DIRECTORY/$PLEX_SERVER_NAME-$account-sync-complete cp -ulv --parents --target-directory=$SYNC_DEST_DIRECTORY
+						xargs -a "$WORK_DIRECTORY"/$PLEX_SERVER_NAME-$account-sync-complete cp -ulv --parents --target-directory=$SYNC_DEST_DIRECTORY
 
 						;;
 			server_watched_files)
